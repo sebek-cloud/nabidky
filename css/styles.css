@@ -1,0 +1,142 @@
+:root {
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --ink: #1c1e21;
+  --muted: #6b7280;
+  --line: #e3e6ea;
+  --accent: #111111;
+  --accent-soft: #f0f0f0;
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.muted { color: var(--muted); }
+
+/* ---------- Login ---------- */
+.login-overlay {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #fff;
+  z-index: 100;
+}
+.login-box {
+  width: 320px; max-width: 90vw;
+  text-align: center;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.login-logo img { width: 220px; max-width: 70%; margin: 0 auto 4px; display: block; }
+.login-box h1 { font-size: 20px; margin: 0; font-weight: 600; }
+.login-box p { margin: 0; }
+.login-box input {
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px;
+  font-size: 16px; text-align: center;
+}
+.login-box button {
+  padding: 12px; border: 0; border-radius: 10px; background: var(--accent);
+  color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.login-box button:hover { opacity: .9; }
+.login-error { color: #c0392b; font-size: 14px; }
+
+/* ---------- Topbar ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 24px; background: #fff; border-bottom: 1px solid var(--line);
+}
+.topbar-logo { height: 26px; }
+.topbar-title { font-weight: 600; font-size: 16px; }
+.topbar-actions { margin-left: auto; display: flex; gap: 8px; }
+
+/* ---------- Buttons ---------- */
+.btn { border: 1px solid transparent; border-radius: 9px; padding: 9px 16px;
+  font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-sm { padding: 6px 12px; font-size: 13px; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { opacity: .9; }
+.btn-ghost { background: #fff; border-color: var(--line); color: var(--ink); }
+.btn-ghost:hover { background: var(--accent-soft); }
+.link { background: none; border: 0; color: #2563eb; cursor: pointer; font-size: 13px; padding: 0; }
+.link:hover { text-decoration: underline; }
+
+/* ---------- Layout ---------- */
+.sheet { max-width: 900px; margin: 24px auto; padding: 0 16px; display: flex; flex-direction: column; gap: 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.card h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0; font-weight: 700; }
+
+.parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 720px) { .parties { grid-template-columns: 1fr; } }
+
+.party-view { font-size: 14px; line-height: 1.6; white-space: pre-line; }
+.party-view .pname { font-weight: 700; font-size: 16px; }
+
+label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+input, select, textarea {
+  font: inherit; color: var(--ink);
+  padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: #fff;
+  width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid #111; outline-offset: -1px; }
+.party-edit { display: flex; flex-direction: column; gap: 10px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.party-edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+
+.ares-lookup { display: flex; gap: 8px; margin-bottom: 10px; }
+.ares-lookup input { flex: 1; }
+.ares-status { font-size: 13px; margin-bottom: 8px; }
+.ares-status.ok { color: #15803d; }
+.ares-status.err { color: #c0392b; }
+.ares-status.load { color: var(--muted); }
+
+/* ---------- Meta ---------- */
+.meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 720px) { .meta { grid-template-columns: 1fr 1fr; } }
+
+/* ---------- Items ---------- */
+.items-head, .item-row {
+  display: grid;
+  grid-template-columns: 1fr 72px 64px 110px 70px 120px 32px;
+  gap: 8px; align-items: center;
+}
+.items-head { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 700; padding: 0 2px 8px; }
+.item-row { padding: 6px 0; border-top: 1px solid var(--line); }
+.item-row input { padding: 8px 9px; }
+.item-total { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; padding-right: 4px; }
+.col-qty, .col-price, .col-vat, .col-total { text-align: right; }
+.item-row .num { text-align: right; }
+.btn-x { border: 0; background: none; color: var(--muted); font-size: 18px; cursor: pointer; line-height: 1; }
+.btn-x:hover { color: #c0392b; }
+.items-foot { margin-top: 12px; }
+@media (max-width: 720px) {
+  .items-head { display: none; }
+  .item-row { grid-template-columns: 1fr 1fr; grid-auto-rows: auto; }
+  .item-row .col-desc { grid-column: 1 / -1; }
+}
+
+/* ---------- Bottom ---------- */
+.bottom { display: grid; grid-template-columns: 1fr 340px; gap: 16px; }
+@media (max-width: 720px) { .bottom { grid-template-columns: 1fr; } }
+.note-card textarea { resize: vertical; }
+.summary-card { display: flex; flex-direction: column; gap: 8px; }
+.summary-row { display: flex; justify-content: space-between; font-size: 14px; }
+.summary-row .lbl { color: var(--muted); }
+.summary-row .val { font-variant-numeric: tabular-nums; }
+.summary-total {
+  display: flex; justify-content: space-between; align-items: baseline;
+  border-top: 2px solid var(--accent); margin-top: 8px; padding-top: 12px;
+  font-weight: 700; font-size: 18px;
+}
+#grand-total { font-variant-numeric: tabular-nums; }
+
+.foot { text-align: center; padding: 24px; font-size: 13px; }
