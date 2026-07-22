@@ -9,6 +9,7 @@
   // Přihlášení řeší server (heslo je v proměnné prostředí APP_PASSWORD).
   var STORAGE_KEY = "orphans_nabidka_v1";
   var SUPPLIER_KEY = "orphans_dodavatel_v1";
+  var SIGNATURE_KEY = "orphans_podpis_v1";
   var COUNTER_KEY = "orphans_counter_v1";
   var ARES_URL = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/";
 
@@ -22,17 +23,25 @@
     telefon: ""
   };
 
+  var DEFAULT_SIGNATURE = {
+    jmeno: "Jakub Sirotek",
+    email: "jakub@orphans.cz",
+    telefon: "+420 705 123 456"
+  };
+
   var CUR_SYMBOL = { CZK: "Kč", EUR: "€", USD: "$" };
 
   /* ------------------------------- Stav ---------------------------------- */
   var state = {
     supplier: loadSupplier(),
+    signature: loadSignature(),
     customer: { nazev: "", ico: "", dic: "", adresa: "" },
     meta: {
       cislo: "",
       datum: todayISO(),
       platnost: addDaysISO(todayISO(), 14),
       mena: "CZK",
+      predmet: "",
       poznamka: ""
     },
     items: []
@@ -96,6 +105,15 @@
   }
   function saveSupplier() { localStorage.setItem(SUPPLIER_KEY, JSON.stringify(state.supplier)); }
 
+  function loadSignature() {
+    try {
+      var raw = localStorage.getItem(SIGNATURE_KEY);
+      if (raw) return Object.assign({}, DEFAULT_SIGNATURE, JSON.parse(raw));
+    } catch (e) {}
+    return Object.assign({}, DEFAULT_SIGNATURE);
+  }
+  function saveSignature() { localStorage.setItem(SIGNATURE_KEY, JSON.stringify(state.signature)); }
+
   function saveDraft() {
     var toSave = { customer: state.customer, meta: state.meta, items: state.items };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
@@ -113,7 +131,12 @@
   }
 
   /* ------------------------------ Výpočty -------------------------------- */
-  function itemBase(it) { return num(it.qty) * num(it.price); }
+  // Koeficient (počet2) je nepovinný – když chybí, bere se jako 1.
+  function coef(it) {
+    if (it.qty2 == null || it.qty2 === "") return 1;
+    return num(it.qty2);
+  }
+  function itemBase(it) { return num(it.qty) * coef(it) * num(it.price); }
 
   function totals() {
     var byRate = {};
@@ -203,6 +226,8 @@
         '<div class="col-desc"><input data-i="' + i + '" data-f="desc" placeholder="Popis položky" value="' + escAttr(it.desc) + '"></div>' +
         '<div class="col-qty"><input class="num" data-i="' + i + '" data-f="qty" inputmode="decimal" value="' + escAttr(it.qty) + '"></div>' +
         '<div class="col-unit"><input data-i="' + i + '" data-f="unit" placeholder="ks" value="' + escAttr(it.unit) + '"></div>' +
+        '<div class="col-qty"><input class="num" data-i="' + i + '" data-f="qty2" inputmode="decimal" placeholder="1" value="' + escAttr(it.qty2) + '"></div>' +
+        '<div class="col-unit"><input data-i="' + i + '" data-f="unit2" placeholder="hod" value="' + escAttr(it.unit2) + '"></div>' +
         '<div class="col-price"><input class="num" data-i="' + i + '" data-f="price" inputmode="decimal" value="' + escAttr(it.price) + '"></div>' +
         '<div class="col-vat"><input class="num" data-i="' + i + '" data-f="vat" inputmode="decimal" value="' + escAttr(it.vat) + '"></div>' +
         '<div class="col-total item-total">' + money(itemBase(it), state.meta.mena) + "</div>" +
@@ -233,7 +258,7 @@
   }
 
   function addItem() {
-    state.items.push({ desc: "", qty: "1", unit: "ks", price: "", vat: "21" });
+    state.items.push({ desc: "", qty: "1", unit: "ks", qty2: "1", unit2: "", price: "", vat: "21" });
     renderItems();
     saveDraft();
   }
@@ -253,14 +278,20 @@
     // Načíst koncept nebo založit nový
     var had = loadDraft();
     if (!state.meta.cislo) state.meta.cislo = nextOfferNumber();
-    if (!state.items.length) state.items = [{ desc: "", qty: "1", unit: "ks", price: "", vat: "21" }];
+    if (!state.items.length) state.items = [{ desc: "", qty: "1", unit: "ks", qty2: "1", unit2: "", price: "", vat: "21" }];
 
     // Naplnit meta pole
     $("#m-cislo").value = state.meta.cislo;
     $("#m-datum").value = state.meta.datum;
     $("#m-platnost").value = state.meta.platnost;
     $("#m-mena").value = state.meta.mena;
+    $("#m-predmet").value = state.meta.predmet || "";
     $("#m-poznamka").value = state.meta.poznamka;
+
+    // Podpis / vystavil
+    $("#sig-jmeno").value = state.signature.jmeno || "";
+    $("#sig-email").value = state.signature.email || "";
+    $("#sig-telefon").value = state.signature.telefon || "";
 
     // Odběratel pole
     fillCustomerInputs();
@@ -287,7 +318,13 @@
     $("#m-datum").addEventListener("input", function () { state.meta.datum = this.value; saveDraft(); });
     $("#m-platnost").addEventListener("input", function () { state.meta.platnost = this.value; saveDraft(); });
     $("#m-mena").addEventListener("change", function () { state.meta.mena = this.value; renderItems(); saveDraft(); });
+    $("#m-predmet").addEventListener("input", function () { state.meta.predmet = this.value; saveDraft(); });
     $("#m-poznamka").addEventListener("input", function () { state.meta.poznamka = this.value; saveDraft(); });
+
+    // Podpis / vystavil
+    $("#sig-jmeno").addEventListener("input", function () { state.signature.jmeno = this.value; saveSignature(); });
+    $("#sig-email").addEventListener("input", function () { state.signature.email = this.value; saveSignature(); });
+    $("#sig-telefon").addEventListener("input", function () { state.signature.telefon = this.value; saveSignature(); });
 
     // Odběratel inputs
     $all("[data-cust]").forEach(function (el) {
@@ -368,7 +405,7 @@
       var del = e.target.getAttribute("data-del");
       if (del != null) {
         state.items.splice(+del, 1);
-        if (!state.items.length) state.items.push({ desc: "", qty: "1", unit: "ks", price: "", vat: "21" });
+        if (!state.items.length) state.items.push({ desc: "", qty: "1", unit: "ks", qty2: "1", unit2: "", price: "", vat: "21" });
         renderItems();
         saveDraft();
       }
@@ -384,16 +421,18 @@
     if (!confirm("Založit novou nabídku? Rozpracovaná data (odběratel, položky) se smažou.")) return;
     localStorage.removeItem(STORAGE_KEY);
     state.customer = { nazev: "", ico: "", dic: "", adresa: "" };
-    state.items = [{ desc: "", qty: "1", unit: "ks", price: "", vat: "21" }];
+    state.items = [{ desc: "", qty: "1", unit: "ks", qty2: "1", unit2: "", price: "", vat: "21" }];
     state.meta.cislo = nextOfferNumber();
     state.meta.datum = todayISO();
     state.meta.platnost = addDaysISO(todayISO(), 14);
+    state.meta.predmet = "";
     state.meta.poznamka = "";
     $("#cust-ico").value = "";
     $("#cust-status").hidden = true;
     $("#m-cislo").value = state.meta.cislo;
     $("#m-datum").value = state.meta.datum;
     $("#m-platnost").value = state.meta.platnost;
+    $("#m-predmet").value = "";
     $("#m-poznamka").value = "";
     fillCustomerInputs();
     renderItems();
@@ -469,6 +508,16 @@
     doc.setTextColor(20);
     y += 6;
 
+    // Předmět / popis nabídky (nad tabulkou)
+    if (m.predmet && m.predmet.trim()) {
+      y += 2;
+      var pLines = doc.splitTextToSize(m.predmet.trim(), mR - mL);
+      doc.setFont("lib", "normal"); doc.setFontSize(10); doc.setTextColor(40);
+      doc.text(pLines, mL, y);
+      y += pLines.length * 4.6 + 4;
+      doc.setTextColor(20);
+    }
+
     // Tabulka položek
     var t = totals();
     var rows = state.items
@@ -476,8 +525,7 @@
       .map(function (it) {
         return [
           it.desc || "",
-          fmtQty(it.qty),
-          it.unit || "",
+          qtyText(it),
           money(num(it.price), mena),
           num(it.vat) + " %",
           money(itemBase(it), mena)
@@ -486,17 +534,16 @@
 
     doc.autoTable({
       startY: y,
-      head: [["Popis", "Počet", "MJ", "Cena / MJ", "DPH", "Celkem bez DPH"]],
+      head: [["Popis", "Množství", "Cena / MJ", "DPH", "Celkem bez DPH"]],
       body: rows,
       margin: { left: mL, right: 18 },
       styles: { font: "lib", fontSize: 9.5, cellPadding: 2.4, textColor: 30, lineColor: 225, lineWidth: 0.1 },
       headStyles: { font: "lib", fontStyle: "bold", fillColor: [17, 17, 17], textColor: 255, halign: "left" },
       columnStyles: {
-        1: { halign: "right", cellWidth: 18 },
-        2: { halign: "center", cellWidth: 14 },
-        3: { halign: "right", cellWidth: 26 },
-        4: { halign: "right", cellWidth: 16 },
-        5: { halign: "right", cellWidth: 30 }
+        1: { halign: "left", cellWidth: 34 },
+        2: { halign: "right", cellWidth: 26 },
+        3: { halign: "right", cellWidth: 16 },
+        4: { halign: "right", cellWidth: 30 }
       }
     });
 
@@ -527,6 +574,25 @@
       doc.setFont("lib", "normal"); doc.setTextColor(40);
       var lines = doc.splitTextToSize(m.poznamka, mR - mL);
       doc.text(lines, mL, afterY + 5);
+      afterY += 5 + lines.length * 4.6;
+    }
+
+    // Podpis / vystavil (vpravo)
+    var sig = state.signature || {};
+    if (sig.jmeno || sig.email || sig.telefon) {
+      var sy = afterY + 12;
+      var sx = mR - 62;
+      doc.setDrawColor(180); doc.setLineWidth(0.3);
+      doc.line(sx, sy, mR, sy);
+      sy += 5;
+      doc.setFont("lib", "bold"); doc.setFontSize(9.5); doc.setTextColor(30);
+      doc.text("Vystavil", sx, sy);
+      sy += 5;
+      doc.setFont("lib", "normal"); doc.setFontSize(9.5); doc.setTextColor(40);
+      if (sig.jmeno) { doc.text(sig.jmeno, sx, sy); sy += 4.6; }
+      if (sig.email) { doc.text(sig.email, sx, sy); sy += 4.6; }
+      if (sig.telefon) { doc.text(sig.telefon, sx, sy); sy += 4.6; }
+      doc.setTextColor(20);
     }
 
     // Patička
@@ -569,6 +635,14 @@
   function fmtQty(q) {
     var n = num(q);
     return (Math.round(n * 100) / 100).toString().replace(".", ",");
+  }
+  // Text množství vč. koeficientu, např. "5 ks × 8 hod"
+  function qtyText(it) {
+    var a = fmtQty(it.qty) + (it.unit ? " " + it.unit : "");
+    var hasCoef = it.qty2 != null && it.qty2 !== "" &&
+      (num(it.qty2) !== 1 || (it.unit2 || "").trim() !== "");
+    if (hasCoef) a += " × " + fmtQty(it.qty2) + (it.unit2 ? " " + it.unit2 : "");
+    return a;
   }
 
   /* ------------------------------ Start ---------------------------------- */

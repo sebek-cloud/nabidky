@@ -84,11 +84,19 @@
         </label>
       </section>
 
+      <!-- Předmět / popis nabídky -->
+      <section class="card">
+        <div class="card-head"><h2>Předmět / popis nabídky</h2></div>
+        <textarea id="m-predmet" rows="3" placeholder="Např. na jaký projekt nabídka je, obecný popis…"></textarea>
+      </section>
+
       <!-- Položky -->
       <section class="items card">
         <div class="items-head">
           <span class="col-desc">Popis</span>
           <span class="col-qty">Počet</span>
+          <span class="col-unit">MJ</span>
+          <span class="col-qty">Koef.</span>
           <span class="col-unit">MJ</span>
           <span class="col-price">Cena / MJ</span>
           <span class="col-vat">DPH %</span>
@@ -98,6 +106,16 @@
         <div id="items-body"></div>
         <div class="items-foot">
           <button id="btn-add-item" class="btn btn-sm btn-ghost" type="button">+ Přidat položku</button>
+        </div>
+      </section>
+
+      <!-- Vystavil / podpis -->
+      <section class="card">
+        <div class="card-head"><h2>Vystavil / podpis</h2></div>
+        <div class="sig-grid">
+          <label>Jméno <input id="sig-jmeno" placeholder="Jméno a příjmení" /></label>
+          <label>E-mail <input id="sig-email" /></label>
+          <label>Telefon <input id="sig-telefon" /></label>
         </div>
       </section>
 
