@@ -29,6 +29,7 @@ function summarize(o) {
     predmet: (o.meta && o.meta.predmet) || "",
     total: typeof o.total === "number" ? o.total : null,
     mena: (o.meta && o.meta.mena) || "CZK",
+    pdf: !!(o.meta && o.meta.pdfExported),
     savedAt: o.savedAt || 0
   };
 }

@@ -10,7 +10,6 @@
   var STORAGE_KEY = "orphans_nabidka_v1";
   var SUPPLIER_KEY = "orphans_dodavatel_v1";
   var SIGNATURE_KEY = "orphans_podpis_v1";
-  var COUNTER_KEY = "orphans_counter_v1";
   var ARES_URL = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/";
 
   var DEFAULT_SUPPLIER = {
@@ -42,7 +41,9 @@
       platnost: addDaysISO(todayISO(), 14),
       mena: "CZK",
       predmet: "",
-      poznamka: ""
+      poznamka: "",
+      pdfExported: false,
+      pdfExportedAt: 0
     },
     items: []
   };
@@ -84,15 +85,27 @@
     return isFinite(n) ? n : 0;
   }
 
-  function nextOfferNumber() {
-    var year = new Date().getFullYear();
-    var raw = localStorage.getItem(COUNTER_KEY);
-    var data = { year: year, seq: 0 };
-    try { if (raw) data = JSON.parse(raw); } catch (e) {}
-    if (data.year !== year) { data.year = year; data.seq = 0; }
-    data.seq += 1;
-    localStorage.setItem(COUNTER_KEY, JSON.stringify(data));
-    return year + "-" + ("000" + data.seq).slice(-3);
+  // Formátování čísla v inputu – oddělovač tisíců mezerou, desetinná čárka.
+  // Zachovává rozepsaný stav (např. "10 000," při psaní).
+  function formatAmountInput(str) {
+    if (str == null) return "";
+    var s = String(str);
+    var neg = s.trim().charAt(0) === "-";
+    var cleaned = s.replace(/[^\d.,]/g, "");
+    if (cleaned === "") return neg ? "-" : "";
+    var sepIdx = cleaned.search(/[.,]/);
+    var intp, decp = null;
+    if (sepIdx >= 0) {
+      intp = cleaned.slice(0, sepIdx).replace(/\D/g, "");
+      decp = cleaned.slice(sepIdx + 1).replace(/\D/g, "");
+    } else {
+      intp = cleaned.replace(/\D/g, "");
+    }
+    intp = intp.replace(/^0+(?=\d)/, ""); // ořezat úvodní nuly
+    var grouped = intp.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    var out = (neg ? "-" : "") + grouped;
+    if (decp !== null) out += "," + decp;
+    return out;
   }
 
   /* --------------------------- localStorage ------------------------------ */
@@ -172,7 +185,7 @@
     toast._t = setTimeout(function () { el.hidden = true; }, 2600);
   }
 
-  function saveOffer() {
+  function saveOffer(fromPdf) {
     var payload = {
       id: currentOfferId || undefined,
       customer: state.customer,
@@ -180,7 +193,7 @@
       items: state.items,
       total: totals().total
     };
-    fetch("/api/offers", {
+    return fetch("/api/offers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -189,7 +202,7 @@
       return r.json();
     }).then(function (res) {
       currentOfferId = res.id;
-      toast("Nabídka uložena ✓");
+      toast(fromPdf === true ? "PDF staženo · nabídka uložena ✓" : "Nabídka uložena ✓");
     }).catch(function (err) {
       toast("Uložení selhalo: " + err.message, true);
     });
@@ -220,9 +233,10 @@
       var sub = [o.odberatel || "—", o.predmet || ""].filter(Boolean).join(" · ");
       var row = document.createElement("div");
       row.className = "offer-item";
+      var badge = o.pdf ? ' <span class="pdf-badge">PDF staženo</span>' : "";
       row.innerHTML =
         '<div class="offer-main">' +
-          '<div class="offer-title">Nabídka ' + esc(o.cislo || "") + "</div>" +
+          '<div class="offer-title">Nabídka ' + esc(o.cislo || "") + badge + "</div>" +
           '<div class="offer-sub">' + esc(sub) + " · " + esc(fmtDate(o.savedAt)) + "</div>" +
         "</div>" +
         '<div class="offer-amount">' + (o.total != null ? esc(money(o.total, o.mena)) : "") + "</div>" +
@@ -277,6 +291,20 @@
     var d = new Date(ts);
     return pad(d.getDate()) + ". " + pad(d.getMonth() + 1) + ". " + d.getFullYear() +
       " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  // Další číslo nabídky = podle uložených nabídek na serveru (sdílené, konzistentní).
+  // Po smazání testovacích nabídek se pořadí samo vrátí na začátek.
+  function computeNextCislo(cb) {
+    var year = new Date().getFullYear();
+    fetch("/api/offers").then(function (r) { return r.ok ? r.json() : []; }).then(function (arr) {
+      var max = 0, re = new RegExp("^" + year + "-(\\d+)$");
+      (arr || []).forEach(function (o) {
+        var m = (o.cislo || "").match(re);
+        if (m) { var n = parseInt(m[1], 10); if (n > max) max = n; }
+      });
+      cb(year + "-" + ("000" + (max + 1)).slice(-3));
+    }).catch(function () { cb(year + "-001"); });
   }
 
   /* -------------------------------- ARES --------------------------------- */
@@ -343,11 +371,11 @@
       row.className = "item-row";
       row.innerHTML =
         '<div class="col-desc"><input data-i="' + i + '" data-f="desc" placeholder="Popis položky" value="' + escAttr(it.desc) + '"></div>' +
-        '<div class="col-qty"><input class="num" data-i="' + i + '" data-f="qty" inputmode="decimal" value="' + escAttr(it.qty) + '"></div>' +
+        '<div class="col-qty"><input class="num" data-i="' + i + '" data-f="qty" inputmode="decimal" value="' + escAttr(formatAmountInput(it.qty)) + '"></div>' +
         '<div class="col-unit"><input data-i="' + i + '" data-f="unit" placeholder="ks" value="' + escAttr(it.unit) + '"></div>' +
-        '<div class="col-qty"><input class="num" data-i="' + i + '" data-f="qty2" inputmode="decimal" placeholder="1" value="' + escAttr(it.qty2) + '"></div>' +
+        '<div class="col-qty"><input class="num" data-i="' + i + '" data-f="qty2" inputmode="decimal" placeholder="1" value="' + escAttr(formatAmountInput(it.qty2)) + '"></div>' +
         '<div class="col-unit"><input data-i="' + i + '" data-f="unit2" placeholder="hod" value="' + escAttr(it.unit2) + '"></div>' +
-        '<div class="col-price"><input class="num" data-i="' + i + '" data-f="price" inputmode="decimal" value="' + escAttr(it.price) + '"></div>' +
+        '<div class="col-price"><input class="num" data-i="' + i + '" data-f="price" inputmode="decimal" value="' + escAttr(formatAmountInput(it.price)) + '"></div>' +
         '<div class="col-vat"><input class="num" data-i="' + i + '" data-f="vat" inputmode="decimal" value="' + escAttr(it.vat) + '"></div>' +
         '<div class="col-total item-total">' + money(itemBase(it), state.meta.mena) + "</div>" +
         '<div class="col-x"><button class="btn-x" data-del="' + i + '" title="Smazat">×</button></div>';
@@ -396,8 +424,10 @@
 
     // Načíst koncept nebo založit nový
     var had = loadDraft();
-    if (!state.meta.cislo) state.meta.cislo = nextOfferNumber();
     if (!state.items.length) state.items = [{ desc: "", qty: "1", unit: "ks", qty2: "1", unit2: "", price: "", vat: "21" }];
+    if (!state.meta.cislo) {
+      computeNextCislo(function (c) { state.meta.cislo = c; $("#m-cislo").value = c; saveDraft(); });
+    }
 
     // Naplnit meta pole
     $("#m-cislo").value = state.meta.cislo;
@@ -513,6 +543,12 @@
       var el = e.target;
       var i = el.getAttribute("data-i"), f = el.getAttribute("data-f");
       if (i == null || !f) return;
+      // formátování tisíců u číselných polí (počet, koef., cena)
+      if (f === "qty" || f === "qty2" || f === "price") {
+        var formatted = formatAmountInput(el.value);
+        if (formatted !== el.value) { el.value = formatted; }
+        try { var end = el.value.length; el.setSelectionRange(end, end); } catch (err) {}
+      }
       state.items[+i][f] = el.value;
       // přepočítat jen řádek + souhrn
       var row = el.closest(".item-row");
@@ -556,14 +592,15 @@
     currentOfferId = null;
     state.customer = { nazev: "", ico: "", dic: "", adresa: "" };
     state.items = [{ desc: "", qty: "1", unit: "ks", qty2: "1", unit2: "", price: "", vat: "21" }];
-    state.meta.cislo = nextOfferNumber();
+    state.meta.cislo = "";
     state.meta.datum = todayISO();
     state.meta.platnost = addDaysISO(todayISO(), 14);
     state.meta.predmet = "";
     state.meta.poznamka = "";
+    state.meta.pdfExported = false;
+    state.meta.pdfExportedAt = 0;
     $("#cust-ico").value = "";
     $("#cust-status").hidden = true;
-    $("#m-cislo").value = state.meta.cislo;
     $("#m-datum").value = state.meta.datum;
     $("#m-platnost").value = state.meta.platnost;
     $("#m-predmet").value = "";
@@ -571,6 +608,7 @@
     fillCustomerInputs();
     renderItems();
     saveDraft();
+    computeNextCislo(function (c) { state.meta.cislo = c; $("#m-cislo").value = c; saveDraft(); });
   }
 
   /* ------------------------------- PDF ----------------------------------- */
@@ -737,6 +775,12 @@
 
     var fname = "nabidka-" + (m.cislo || "").replace(/[^\w-]/g, "") + ".pdf";
     doc.save(fname);
+
+    // Označit nabídku jako staženou a uložit (aby byl příznak vidět v seznamu)
+    state.meta.pdfExported = true;
+    state.meta.pdfExportedAt = Date.now();
+    saveDraft();
+    saveOffer(true);
   }
 
   function drawParty(doc, x, y, lines) {

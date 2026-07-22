@@ -106,13 +106,16 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #111; outline-off
 /* ---------- Items ---------- */
 .items-head, .item-row {
   display: grid;
-  grid-template-columns: 1fr 60px 54px 60px 54px 92px 54px 106px 28px;
+  grid-template-columns: minmax(150px, 1fr) 56px 48px 56px 48px 86px 48px 120px 26px;
   gap: 7px; align-items: center;
 }
 .items-head { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 700; padding: 0 2px 8px; }
 .item-row { padding: 6px 0; border-top: 1px solid var(--line); }
 .item-row input { padding: 8px 9px; }
-.item-total { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; padding-right: 4px; }
+.item-total {
+  text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; padding-right: 4px;
+  overflow-wrap: anywhere; line-height: 1.25;
+}
 .col-qty, .col-price, .col-vat, .col-total { text-align: right; }
 .item-row .num { text-align: right; }
 .btn-x { border: 0; background: none; color: var(--muted); font-size: 18px; cursor: pointer; line-height: 1; }
@@ -169,6 +172,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #111; outline-off
 .offer-sub { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .offer-actions { display: flex; gap: 6px; }
 .offer-amount { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+.pdf-badge {
+  display: inline-block; font-size: 11px; font-weight: 700; vertical-align: middle;
+  background: #e7f5ec; color: #15803d; padding: 2px 8px; border-radius: 999px; margin-left: 6px;
+}
 .offers-empty { padding: 28px; text-align: center; color: var(--muted); }
 
 /* ---------- Toast ---------- */
