@@ -1,36 +1,42 @@
 # Orphans – Vyúčtovací nabídky
 
-Jednoduchá webová aplikace pro tvorbu vyúčtovacích nabídek za **Orphans s.r.o.**
-Běží čistě v prohlížeči, žádný server ani databáze — data se ukládají jen lokálně
-(localStorage) ve vašem prohlížeči.
+Webová aplikace pro tvorbu vyúčtovacích nabídek za **Orphans s.r.o.**
+Samotná nabídka běží v prohlížeči (data jen v `localStorage`), přístup chrání
+**malý Node server s přihlášením** – heslo je v proměnné prostředí, ne v kódu.
 
 ## Funkce
-- Přihlášení heslem (klientská závora).
-- Hlavička dodavatele (Orphans s.r.o.) — editovatelná, uložená v prohlížeči.
-- Odběratel: zadáte **IČO** a tlačítkem **Načíst z ARES** se doplní název, adresa a DIČ.
+- **Přihlášení** heslem – ověřuje server (podepsaná HttpOnly cookie). Heslo v kódu není.
+- Hlavička dodavatele (Orphans s.r.o.) – editovatelná, uložená v prohlížeči.
+- Odběratel: zadáte **IČO** a tlačítkem **Načíst z ARES** se doplní název, adresa, DIČ.
 - Položky à la Fakturoid (počet, MJ, popis, cena/MJ, DPH %) s automatickým přepočtem
   základu, DPH podle sazeb a celkové částky.
 - Export do **PDF** (s logem a plnou českou diakritikou).
+- **Odhlášení** tlačítkem v horní liště.
+
+## Proměnné prostředí
+| Proměnná       | Význam                                    | Výchozí                                  |
+|----------------|-------------------------------------------|------------------------------------------|
+| `APP_PASSWORD` | Heslo pro vstup do aplikace               | `peakyblinders` (změňte!)                |
+| `APP_SECRET`   | Tajný klíč pro podpis přihlašovací cookie | odvozeno z hesla (doporučeno nastavit)   |
+| `PORT`         | Port serveru                              | `3000` (Railway nastaví sám)             |
+
+## Nasazení na Railway
+1. Railway → **New Project → Deploy from GitHub repo** → vyberte `sebek-cloud/nabidky`,
+   větev `claude/billing-offers-app-e57xwi` (nebo `main` po sloučení).
+2. Railway detekuje Node (`package.json`) a spustí `npm start` → `node server.js`.
+3. V **Variables** nastavte:
+   - `APP_PASSWORD` = vaše heslo,
+   - `APP_SECRET` = libovolný náhodný řetězec (např. 32+ znaků).
+4. V **Settings → Networking → Generate Domain** vytvořte veřejnou adresu.
 
 ## Spuštění lokálně
-Otevřete `index.html` v prohlížeči, nebo:
 ```bash
-python3 -m http.server 8000
-# → http://localhost:8000
+APP_PASSWORD="tajneheslo" node server.js
+# → http://localhost:3000
 ```
 
-## Nasazení (GitHub Pages)
-1. **Settings → Pages**
-2. **Source:** Deploy from a branch
-3. **Branch:** `claude/billing-offers-app-e57xwi` (nebo `main` po sloučení), složka `/ (root)`
-4. Uložit → web poběží na `https://sebek-cloud.github.io/nabidky/`
-
-## Zabezpečení
-Heslo je pouze klientská závora v `js/app.js` (`PASSWORD`). Skryje appku před náhodným
-návštěvníkem, ale **není to silné zabezpečení** — repozitář je veřejný, takže heslo je
-čitelné ve zdrojovém kódu. Pro citlivá data (číslo účtu) je nechte vyplnit až v aplikaci;
-neukládají se do repozitáře. Pro skutečnou ochranu použijte hosting s autentizací
-(Vercel/Cloudflare Access).
-
-## Změna hesla
-V `js/app.js` uprav `var PASSWORD = "peakyblinders";`.
+## Bezpečnost
+Heslo se ověřuje na serveru a je uložené jen v proměnné prostředí (`APP_PASSWORD`),
+takže **ve zdrojovém kódu ani v repozitáři není**. Bez správné cookie server
+neposkytne ani aplikaci, ani její soubory. Číslo bankovního účtu se zadává až
+v aplikaci a ukládá se pouze ve vašem prohlížeči – do repozitáře se neukládá.

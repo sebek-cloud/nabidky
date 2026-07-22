@@ -8,26 +8,15 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <!-- ======================= PŘIHLÁŠENÍ ======================= -->
-  <div id="login" class="login-overlay">
-    <form id="login-form" class="login-box" autocomplete="off">
-      <div class="login-logo"><img id="login-logo-img" alt="ORPHANS" /></div>
-      <h1>Vyúčtovací nabídky</h1>
-      <p class="muted">Zadejte heslo pro vstup</p>
-      <input type="password" id="password" placeholder="Heslo" autofocus />
-      <button type="submit">Vstoupit</button>
-      <div id="login-error" class="login-error" hidden>Nesprávné heslo.</div>
-    </form>
-  </div>
-
   <!-- ======================= APLIKACE ======================= -->
-  <div id="app" hidden>
+  <div id="app">
     <header class="topbar">
       <img id="topbar-logo" class="topbar-logo" alt="ORPHANS" />
       <div class="topbar-title">Vyúčtovací nabídka</div>
       <div class="topbar-actions">
         <button id="btn-new" class="btn btn-ghost" type="button">Nová nabídka</button>
         <button id="btn-pdf" class="btn btn-primary" type="button">Stáhnout PDF</button>
+        <button id="btn-logout" class="btn btn-ghost" type="button">Odhlásit</button>
       </div>
     </header>
 

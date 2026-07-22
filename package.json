@@ -1,0 +1,12 @@
+{
+  "name": "nabidky",
+  "version": "1.0.0",
+  "description": "Generátor vyúčtovacích nabídek pro Orphans s.r.o.",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -6,7 +6,7 @@
   "use strict";
 
   /* ----------------------------- Konfigurace ----------------------------- */
-  var PASSWORD = "peakyblinders";
+  // Přihlášení řeší server (heslo je v proměnné prostředí APP_PASSWORD).
   var STORAGE_KEY = "orphans_nabidka_v1";
   var SUPPLIER_KEY = "orphans_dodavatel_v1";
   var COUNTER_KEY = "orphans_counter_v1";
@@ -130,31 +130,11 @@
     return { base: base, vat: vat, total: base + vat, byRate: byRate };
   }
 
-  /* ------------------------------ Přihlášení ----------------------------- */
-  function initLogin() {
-    var img = $("#login-logo-img");
-    if (img && window.ORPHANS_LOGO) img.src = window.ORPHANS_LOGO;
-
-    if (sessionStorage.getItem("orphans_auth") === "1") { showApp(); return; }
-
-    $("#login-form").addEventListener("submit", function (e) {
-      e.preventDefault();
-      var val = $("#password").value;
-      if (val === PASSWORD) {
-        sessionStorage.setItem("orphans_auth", "1");
-        showApp();
-      } else {
-        $("#login-error").hidden = false;
-        $("#password").value = "";
-        $("#password").focus();
-      }
-    });
-  }
-
-  function showApp() {
-    $("#login").hidden = true;
-    $("#app").hidden = false;
-    initApp();
+  /* ------------------------------ Odhlášení ------------------------------ */
+  function logout() {
+    fetch("/api/logout", { method: "POST" }).then(function () {
+      window.location.reload();
+    }).catch(function () { window.location.reload(); });
   }
 
   /* -------------------------------- ARES --------------------------------- */
@@ -397,6 +377,7 @@
     $("#btn-add-item").addEventListener("click", addItem);
     $("#btn-pdf").addEventListener("click", generatePDF);
     $("#btn-new").addEventListener("click", newOffer);
+    $("#btn-logout").addEventListener("click", logout);
   }
 
   function newOffer() {
@@ -591,5 +572,5 @@
   }
 
   /* ------------------------------ Start ---------------------------------- */
-  document.addEventListener("DOMContentLoaded", initLogin);
+  document.addEventListener("DOMContentLoaded", initApp);
 })();
