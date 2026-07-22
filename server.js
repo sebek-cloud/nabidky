@@ -19,34 +19,87 @@ const SECRET = process.env.APP_SECRET || crypto.createHash("sha256").update("orp
 const MAX_AGE = 7 * 24 * 60 * 60; // 7 dní
 const COOKIE = "orphans_sid";
 
-// Perzistentní úložiště nabídek. Na Railway namontuj Volume a nastav DATA_DIR
-// (např. /data), jinak se data ztratí při redeployi.
-const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
-try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) { console.error("DATA_DIR:", e.message); }
-
 function safeId(id) { return /^[A-Za-z0-9_-]{1,64}$/.test(id); }
-function offerPath(id) { return path.join(DATA_DIR, id + ".json"); }
 
-function listOffers() {
-  let files = [];
-  try { files = fs.readdirSync(DATA_DIR).filter(function (f) { return f.endsWith(".json"); }); } catch (e) {}
-  const out = [];
-  files.forEach(function (f) {
-    try {
-      const o = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), "utf8"));
-      out.push({
-        id: o.id,
-        cislo: (o.meta && o.meta.cislo) || "",
-        odberatel: (o.customer && o.customer.nazev) || "",
-        predmet: (o.meta && o.meta.predmet) || "",
-        total: typeof o.total === "number" ? o.total : null,
-        mena: (o.meta && o.meta.mena) || "CZK",
-        savedAt: o.savedAt || 0
-      });
-    } catch (e) {}
+function summarize(o) {
+  return {
+    id: o.id,
+    cislo: (o.meta && o.meta.cislo) || "",
+    odberatel: (o.customer && o.customer.nazev) || "",
+    predmet: (o.meta && o.meta.predmet) || "",
+    total: typeof o.total === "number" ? o.total : null,
+    mena: (o.meta && o.meta.mena) || "CZK",
+    savedAt: o.savedAt || 0
+  };
+}
+
+/* =====================================================================
+   Úložiště nabídek – dvě varianty se stejným (async) rozhraním:
+   - PostgreSQL, pokud je nastavená DATABASE_URL (trvalé, přežije redeploy),
+   - jinak soubory v DATA_DIR (fallback; bez Railway Volume nepřežije deploy).
+   ===================================================================== */
+let storage;
+
+if (process.env.DATABASE_URL) {
+  const { Pool } = require("pg");
+  let host = "";
+  try { host = new URL(process.env.DATABASE_URL).hostname; } catch (e) {}
+  const internal = /\.railway\.internal$/.test(host) || host === "localhost" || host === "127.0.0.1";
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: internal ? false : { rejectUnauthorized: false }
   });
-  out.sort(function (a, b) { return (b.savedAt || 0) - (a.savedAt || 0); });
-  return out;
+  const ready = pool.query(
+    "CREATE TABLE IF NOT EXISTS offers (id TEXT PRIMARY KEY, saved_at BIGINT, data JSONB)"
+  ).then(function () { console.log("Úložiště: PostgreSQL"); })
+   .catch(function (e) { console.error("PG init:", e.message); });
+
+  storage = {
+    async list() {
+      await ready;
+      const r = await pool.query("SELECT data FROM offers ORDER BY saved_at DESC");
+      return r.rows.map(function (row) { return summarize(row.data); });
+    },
+    async get(id) {
+      await ready;
+      const r = await pool.query("SELECT data FROM offers WHERE id = $1", [id]);
+      return r.rows.length ? r.rows[0].data : null;
+    },
+    async save(rec) {
+      await ready;
+      await pool.query(
+        "INSERT INTO offers (id, saved_at, data) VALUES ($1, $2, $3) " +
+        "ON CONFLICT (id) DO UPDATE SET saved_at = EXCLUDED.saved_at, data = EXCLUDED.data",
+        [rec.id, rec.savedAt, JSON.stringify(rec)]
+      );
+    },
+    async del(id) {
+      await ready;
+      await pool.query("DELETE FROM offers WHERE id = $1", [id]);
+    }
+  };
+} else {
+  const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) { console.error("DATA_DIR:", e.message); }
+  console.log("Úložiště: soubory v " + DATA_DIR);
+  const offerPath = function (id) { return path.join(DATA_DIR, id + ".json"); };
+  storage = {
+    async list() {
+      let files = [];
+      try { files = fs.readdirSync(DATA_DIR).filter(function (f) { return f.endsWith(".json"); }); } catch (e) {}
+      const out = [];
+      files.forEach(function (f) {
+        try { out.push(summarize(JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), "utf8")))); } catch (e) {}
+      });
+      out.sort(function (a, b) { return (b.savedAt || 0) - (a.savedAt || 0); });
+      return out;
+    },
+    async get(id) {
+      try { return JSON.parse(fs.readFileSync(offerPath(id), "utf8")); } catch (e) { return null; }
+    },
+    async save(rec) { fs.writeFileSync(offerPath(rec.id), JSON.stringify(rec)); },
+    async del(id) { try { fs.unlinkSync(offerPath(id)); } catch (e) {} }
+  };
 }
 
 /* ---- logo pro přihlašovací stránku (vytáhneme data-URI z js/logo.js) ---- */
@@ -201,19 +254,22 @@ const server = http.createServer(function (req, res) {
 
   // ------------------------- API: uložené nabídky -------------------------
   const jsonHead = { "Content-Type": "application/json; charset=utf-8" };
+  function fail(code, msg) { res.writeHead(code, jsonHead); res.end(JSON.stringify({ error: msg })); }
 
   // seznam
   if (req.method === "GET" && url === "/api/offers") {
-    res.writeHead(200, jsonHead);
-    return res.end(JSON.stringify(listOffers()));
+    storage.list()
+      .then(function (arr) { res.writeHead(200, jsonHead); res.end(JSON.stringify(arr)); })
+      .catch(function (e) { console.error("list:", e.message); fail(500, "list failed"); });
+    return;
   }
 
   // vytvořit / uložit
   if (req.method === "POST" && url === "/api/offers") {
     return readBody(req, function (body) {
       let data;
-      try { data = JSON.parse(body || "{}"); } catch (e) { res.writeHead(400, jsonHead); return res.end('{"error":"bad json"}'); }
-      let id = data.id && safeId(String(data.id)) ? String(data.id) : crypto.randomUUID();
+      try { data = JSON.parse(body || "{}"); } catch (e) { return fail(400, "bad json"); }
+      const id = data.id && safeId(String(data.id)) ? String(data.id) : crypto.randomUUID();
       const record = {
         id: id,
         savedAt: Date.now(),
@@ -222,14 +278,9 @@ const server = http.createServer(function (req, res) {
         items: data.items || [],
         total: typeof data.total === "number" ? data.total : null
       };
-      try {
-        fs.writeFileSync(offerPath(id), JSON.stringify(record));
-        res.writeHead(200, jsonHead);
-        return res.end(JSON.stringify({ id: id, savedAt: record.savedAt }));
-      } catch (e) {
-        res.writeHead(500, jsonHead);
-        return res.end('{"error":"save failed"}');
-      }
+      storage.save(record)
+        .then(function () { res.writeHead(200, jsonHead); res.end(JSON.stringify({ id: id, savedAt: record.savedAt })); })
+        .catch(function (e) { console.error("save:", e.message); fail(500, "save failed"); });
     });
   }
 
@@ -237,18 +288,18 @@ const server = http.createServer(function (req, res) {
   const mOffer = url.match(/^\/api\/offers\/([^/?]+)$/);
   if (mOffer) {
     const id = decodeURIComponent(mOffer[1]);
-    if (!safeId(id)) { res.writeHead(400, jsonHead); return res.end('{"error":"bad id"}'); }
+    if (!safeId(id)) return fail(400, "bad id");
     if (req.method === "GET") {
-      try {
-        const raw = fs.readFileSync(offerPath(id), "utf8");
-        res.writeHead(200, jsonHead);
-        return res.end(raw);
-      } catch (e) { res.writeHead(404, jsonHead); return res.end('{"error":"not found"}'); }
+      storage.get(id)
+        .then(function (o) { if (!o) return fail(404, "not found"); res.writeHead(200, jsonHead); res.end(JSON.stringify(o)); })
+        .catch(function (e) { console.error("get:", e.message); fail(500, "get failed"); });
+      return;
     }
     if (req.method === "DELETE") {
-      try { fs.unlinkSync(offerPath(id)); } catch (e) {}
-      res.writeHead(200, jsonHead);
-      return res.end('{"ok":true}');
+      storage.del(id)
+        .then(function () { res.writeHead(200, jsonHead); res.end('{"ok":true}'); })
+        .catch(function (e) { console.error("del:", e.message); fail(500, "delete failed"); });
+      return;
     }
   }
 

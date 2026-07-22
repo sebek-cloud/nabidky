@@ -23,16 +23,23 @@ Samotná nabídka běží v prohlížeči (data jen v `localStorage`), přístup
 |----------------|-------------------------------------------|------------------------------------------|
 | `APP_PASSWORD` | Heslo pro vstup do aplikace               | `peakyblinders` (změňte!)                |
 | `APP_SECRET`   | Tajný klíč pro podpis přihlašovací cookie | odvozeno z hesla (doporučeno nastavit)   |
-| `DATA_DIR`     | Složka pro uložené nabídky (JSON soubory) | `./data` (na Railway nastavte na Volume) |
+| `DATABASE_URL` | Připojení k PostgreSQL (trvalé úložiště)  | – (bez ní se použije soubor `DATA_DIR`)  |
+| `DATA_DIR`     | Fallback složka pro nabídky (JSON)        | `./data`                                 |
 | `PORT`         | Port serveru                              | `3000` (Railway nastaví sám)             |
 
-## Trvalé úložiště nabídek (Railway Volume)
-Uložené nabídky se zapisují jako JSON do `DATA_DIR`. Aby přežily i redeploy,
-připojte na Railway **Volume**:
-1. Service → **Settings → Volumes → Add Volume**, mount path např. `/data`.
-2. Do **Variables** přidejte `DATA_DIR=/data`.
+## Trvalé úložiště nabídek
+Server ukládá nabídky dvěma způsoby (podle prostředí):
 
-Bez Volume data přežijí restart, ale při novém deployi se ztratí.
+**A) PostgreSQL (doporučeno – přežije redeploy).** Když je nastavená
+`DATABASE_URL`, nabídky se ukládají do tabulky `offers` (vytvoří se sama).
+Na Railway:
+1. V projektu **Create → Database → Add PostgreSQL**.
+2. V service `nabidky` → **Variables → New Variable**: `DATABASE_URL` =
+   `${{Postgres.DATABASE_URL}}` (odkaz na databázi ve stejném projektu).
+
+**B) Soubory (fallback).** Bez `DATABASE_URL` se ukládá do `DATA_DIR` (výchozí
+`./data`). Přežije restart, ale při novém deployi se ztratí (pokud není
+připojený Railway Volume na `DATA_DIR`).
 
 ## Nasazení na Railway
 1. Railway → **New Project → Deploy from GitHub repo** → vyberte `sebek-cloud/nabidky`,
