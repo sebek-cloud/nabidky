@@ -10,6 +10,11 @@ Samotná nabídka běží v prohlížeči (data jen v `localStorage`), přístup
 - Odběratel: zadáte **IČO** a tlačítkem **Načíst z ARES** se doplní název, adresa, DIČ.
 - Položky à la Fakturoid (počet, MJ, popis, cena/MJ, DPH %) s automatickým přepočtem
   základu, DPH podle sazeb a celkové částky.
+- Položky mají **dva násobitele** (počet × koeficient), každý s vlastním názvem MJ
+  (např. `5 ks × 8 hod`).
+- Volné pole **Předmět / popis nabídky** a **Poznámka**.
+- **Vystavil / podpis** (default Jakub Sirotek) – propisuje se do PDF.
+- **Ukládání nabídek na server** – tlačítko „Uložit", seznam „Uložené" (Načíst / Smazat).
 - Export do **PDF** (s logem a plnou českou diakritikou).
 - **Odhlášení** tlačítkem v horní liště.
 
@@ -18,7 +23,16 @@ Samotná nabídka běží v prohlížeči (data jen v `localStorage`), přístup
 |----------------|-------------------------------------------|------------------------------------------|
 | `APP_PASSWORD` | Heslo pro vstup do aplikace               | `peakyblinders` (změňte!)                |
 | `APP_SECRET`   | Tajný klíč pro podpis přihlašovací cookie | odvozeno z hesla (doporučeno nastavit)   |
+| `DATA_DIR`     | Složka pro uložené nabídky (JSON soubory) | `./data` (na Railway nastavte na Volume) |
 | `PORT`         | Port serveru                              | `3000` (Railway nastaví sám)             |
+
+## Trvalé úložiště nabídek (Railway Volume)
+Uložené nabídky se zapisují jako JSON do `DATA_DIR`. Aby přežily i redeploy,
+připojte na Railway **Volume**:
+1. Service → **Settings → Volumes → Add Volume**, mount path např. `/data`.
+2. Do **Variables** přidejte `DATA_DIR=/data`.
+
+Bez Volume data přežijí restart, ale při novém deployi se ztratí.
 
 ## Nasazení na Railway
 1. Railway → **New Project → Deploy from GitHub repo** → vyberte `sebek-cloud/nabidky`,

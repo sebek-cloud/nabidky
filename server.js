@@ -19,6 +19,36 @@ const SECRET = process.env.APP_SECRET || crypto.createHash("sha256").update("orp
 const MAX_AGE = 7 * 24 * 60 * 60; // 7 dní
 const COOKIE = "orphans_sid";
 
+// Perzistentní úložiště nabídek. Na Railway namontuj Volume a nastav DATA_DIR
+// (např. /data), jinak se data ztratí při redeployi.
+const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
+try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) { console.error("DATA_DIR:", e.message); }
+
+function safeId(id) { return /^[A-Za-z0-9_-]{1,64}$/.test(id); }
+function offerPath(id) { return path.join(DATA_DIR, id + ".json"); }
+
+function listOffers() {
+  let files = [];
+  try { files = fs.readdirSync(DATA_DIR).filter(function (f) { return f.endsWith(".json"); }); } catch (e) {}
+  const out = [];
+  files.forEach(function (f) {
+    try {
+      const o = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), "utf8"));
+      out.push({
+        id: o.id,
+        cislo: (o.meta && o.meta.cislo) || "",
+        odberatel: (o.customer && o.customer.nazev) || "",
+        predmet: (o.meta && o.meta.predmet) || "",
+        total: typeof o.total === "number" ? o.total : null,
+        mena: (o.meta && o.meta.mena) || "CZK",
+        savedAt: o.savedAt || 0
+      });
+    } catch (e) {}
+  });
+  out.sort(function (a, b) { return (b.savedAt || 0) - (a.savedAt || 0); });
+  return out;
+}
+
 /* ---- logo pro přihlašovací stránku (vytáhneme data-URI z js/logo.js) ---- */
 let LOGO_DATA_URI = "";
 try {
@@ -164,8 +194,62 @@ const server = http.createServer(function (req, res) {
 
   // Vše ostatní vyžaduje přihlášení
   if (!isAuthed(req)) {
+    if (url.indexOf("/api/") === 0) { res.writeHead(401, { "Content-Type": "application/json" }); return res.end('{"error":"unauthorized"}'); }
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     return res.end(loginPage(""));
+  }
+
+  // ------------------------- API: uložené nabídky -------------------------
+  const jsonHead = { "Content-Type": "application/json; charset=utf-8" };
+
+  // seznam
+  if (req.method === "GET" && url === "/api/offers") {
+    res.writeHead(200, jsonHead);
+    return res.end(JSON.stringify(listOffers()));
+  }
+
+  // vytvořit / uložit
+  if (req.method === "POST" && url === "/api/offers") {
+    return readBody(req, function (body) {
+      let data;
+      try { data = JSON.parse(body || "{}"); } catch (e) { res.writeHead(400, jsonHead); return res.end('{"error":"bad json"}'); }
+      let id = data.id && safeId(String(data.id)) ? String(data.id) : crypto.randomUUID();
+      const record = {
+        id: id,
+        savedAt: Date.now(),
+        customer: data.customer || {},
+        meta: data.meta || {},
+        items: data.items || [],
+        total: typeof data.total === "number" ? data.total : null
+      };
+      try {
+        fs.writeFileSync(offerPath(id), JSON.stringify(record));
+        res.writeHead(200, jsonHead);
+        return res.end(JSON.stringify({ id: id, savedAt: record.savedAt }));
+      } catch (e) {
+        res.writeHead(500, jsonHead);
+        return res.end('{"error":"save failed"}');
+      }
+    });
+  }
+
+  // detail / smazání konkrétní nabídky: /api/offers/<id>
+  const mOffer = url.match(/^\/api\/offers\/([^/?]+)$/);
+  if (mOffer) {
+    const id = decodeURIComponent(mOffer[1]);
+    if (!safeId(id)) { res.writeHead(400, jsonHead); return res.end('{"error":"bad id"}'); }
+    if (req.method === "GET") {
+      try {
+        const raw = fs.readFileSync(offerPath(id), "utf8");
+        res.writeHead(200, jsonHead);
+        return res.end(raw);
+      } catch (e) { res.writeHead(404, jsonHead); return res.end('{"error":"not found"}'); }
+    }
+    if (req.method === "DELETE") {
+      try { fs.unlinkSync(offerPath(id)); } catch (e) {}
+      res.writeHead(200, jsonHead);
+      return res.end('{"ok":true}');
+    }
   }
 
   serveStatic(req, res, url);

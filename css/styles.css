@@ -143,3 +143,38 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #111; outline-off
 @media (max-width: 720px) { .sig-grid { grid-template-columns: 1fr; } }
 
 .foot { text-align: center; padding: 24px; font-size: 13px; }
+
+/* ---------- Modal: uložené nabídky ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(0,0,0,.35);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 60px 16px;
+}
+.modal-box {
+  background: #fff; border-radius: 14px; width: 640px; max-width: 100%;
+  max-height: 80vh; display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,.25);
+}
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { margin: 0; font-size: 16px; }
+.offers-list { overflow-y: auto; padding: 8px; }
+.offer-item {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;
+  padding: 12px 14px; border-radius: 10px;
+}
+.offer-item:hover { background: var(--accent-soft); }
+.offer-main { min-width: 0; }
+.offer-title { font-weight: 600; }
+.offer-sub { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.offer-actions { display: flex; gap: 6px; }
+.offer-amount { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+.offers-empty { padding: 28px; text-align: center; color: var(--muted); }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: #111; color: #fff; padding: 12px 20px; border-radius: 10px;
+  font-size: 14px; z-index: 60; box-shadow: 0 6px 20px rgba(0,0,0,.3);
+}
+.toast.err { background: #c0392b; }

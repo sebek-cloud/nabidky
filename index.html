@@ -15,6 +15,8 @@
       <div class="topbar-title">Vyúčtovací nabídka</div>
       <div class="topbar-actions">
         <button id="btn-new" class="btn btn-ghost" type="button">Nová nabídka</button>
+        <button id="btn-open" class="btn btn-ghost" type="button">Uložené</button>
+        <button id="btn-save" class="btn btn-ghost" type="button">Uložit</button>
         <button id="btn-pdf" class="btn btn-primary" type="button">Stáhnout PDF</button>
         <button id="btn-logout" class="btn btn-ghost" type="button">Odhlásit</button>
       </div>
@@ -136,9 +138,23 @@
     </main>
 
     <footer class="foot muted">
-      Data se ukládají pouze ve vašem prohlížeči. · Orphans s.r.o.
+      Rozpracovaná nabídka se ukládá ve vašem prohlížeči. Tlačítkem „Uložit" ji uložíte na server. · Orphans s.r.o.
     </footer>
   </div>
+
+  <!-- Modal: uložené nabídky -->
+  <div id="offers-modal" class="modal" hidden>
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2>Uložené nabídky</h2>
+        <button id="offers-close" class="btn-x" type="button" title="Zavřít">×</button>
+      </div>
+      <div id="offers-list" class="offers-list"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" hidden></div>
 
   <script src="js/logo.js"></script>
   <script src="js/font.js"></script>

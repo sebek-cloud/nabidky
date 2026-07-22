@@ -160,6 +160,125 @@
     }).catch(function () { window.location.reload(); });
   }
 
+  /* --------------------------- Uložené nabídky --------------------------- */
+  var currentOfferId = null;
+
+  function toast(msg, isErr) {
+    var el = $("#toast");
+    el.textContent = msg;
+    el.className = "toast" + (isErr ? " err" : "");
+    el.hidden = false;
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { el.hidden = true; }, 2600);
+  }
+
+  function saveOffer() {
+    var payload = {
+      id: currentOfferId || undefined,
+      customer: state.customer,
+      meta: state.meta,
+      items: state.items,
+      total: totals().total
+    };
+    fetch("/api/offers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (res) {
+      currentOfferId = res.id;
+      toast("Nabídka uložena ✓");
+    }).catch(function (err) {
+      toast("Uložení selhalo: " + err.message, true);
+    });
+  }
+
+  function openOffers() {
+    var list = $("#offers-list");
+    list.innerHTML = '<div class="offers-empty">Načítám…</div>';
+    $("#offers-modal").hidden = false;
+    fetch("/api/offers").then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (arr) {
+      renderOffersList(arr);
+    }).catch(function (err) {
+      list.innerHTML = '<div class="offers-empty">Chyba: ' + esc(err.message) + "</div>";
+    });
+  }
+
+  function renderOffersList(arr) {
+    var list = $("#offers-list");
+    if (!arr.length) {
+      list.innerHTML = '<div class="offers-empty">Zatím žádné uložené nabídky.</div>';
+      return;
+    }
+    list.innerHTML = "";
+    arr.forEach(function (o) {
+      var sub = [o.odberatel || "—", o.predmet || ""].filter(Boolean).join(" · ");
+      var row = document.createElement("div");
+      row.className = "offer-item";
+      row.innerHTML =
+        '<div class="offer-main">' +
+          '<div class="offer-title">Nabídka ' + esc(o.cislo || "") + "</div>" +
+          '<div class="offer-sub">' + esc(sub) + " · " + esc(fmtDate(o.savedAt)) + "</div>" +
+        "</div>" +
+        '<div class="offer-amount">' + (o.total != null ? esc(money(o.total, o.mena)) : "") + "</div>" +
+        '<div class="offer-actions" style="grid-column:2">' +
+          '<button class="btn btn-sm btn-primary" data-load="' + esc(o.id) + '">Načíst</button>' +
+          '<button class="btn btn-sm btn-ghost" data-del-offer="' + esc(o.id) + '">Smazat</button>' +
+        "</div>";
+      list.appendChild(row);
+    });
+  }
+
+  function loadOffer(id) {
+    fetch("/api/offers/" + encodeURIComponent(id)).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (o) {
+      state.customer = Object.assign({ nazev: "", ico: "", dic: "", adresa: "" }, o.customer || {});
+      state.meta = Object.assign(state.meta, o.meta || {});
+      state.items = (o.items && o.items.length) ? o.items : [{ desc: "", qty: "1", unit: "ks", qty2: "1", unit2: "", price: "", vat: "21" }];
+      currentOfferId = o.id;
+      // překreslit vše
+      $("#m-cislo").value = state.meta.cislo || "";
+      $("#m-datum").value = state.meta.datum || "";
+      $("#m-platnost").value = state.meta.platnost || "";
+      $("#m-mena").value = state.meta.mena || "CZK";
+      $("#m-predmet").value = state.meta.predmet || "";
+      $("#m-poznamka").value = state.meta.poznamka || "";
+      fillCustomerInputs();
+      renderItems();
+      saveDraft();
+      $("#offers-modal").hidden = true;
+      toast("Nabídka " + (state.meta.cislo || "") + " načtena");
+    }).catch(function (err) {
+      toast("Načtení selhalo: " + err.message, true);
+    });
+  }
+
+  function deleteOffer(id) {
+    if (!confirm("Opravdu smazat tuto uloženou nabídku?")) return;
+    fetch("/api/offers/" + encodeURIComponent(id), { method: "DELETE" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      if (currentOfferId === id) currentOfferId = null;
+      openOffers();
+      toast("Smazáno");
+    }).catch(function (err) {
+      toast("Smazání selhalo: " + err.message, true);
+    });
+  }
+
+  function fmtDate(ts) {
+    if (!ts) return "";
+    var d = new Date(ts);
+    return pad(d.getDate()) + ". " + pad(d.getMonth() + 1) + ". " + d.getFullYear() +
+      " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
   /* -------------------------------- ARES --------------------------------- */
   function fetchAres(ico) {
     ico = String(ico || "").replace(/\D/g, "");
@@ -415,11 +534,26 @@
     $("#btn-pdf").addEventListener("click", generatePDF);
     $("#btn-new").addEventListener("click", newOffer);
     $("#btn-logout").addEventListener("click", logout);
+
+    // Uložené nabídky
+    $("#btn-save").addEventListener("click", saveOffer);
+    $("#btn-open").addEventListener("click", openOffers);
+    $("#offers-close").addEventListener("click", function () { $("#offers-modal").hidden = true; });
+    $("#offers-modal").addEventListener("click", function (e) {
+      if (e.target === this) this.hidden = true; // klik mimo box zavře
+    });
+    $("#offers-list").addEventListener("click", function (e) {
+      var load = e.target.getAttribute("data-load");
+      var del = e.target.getAttribute("data-del-offer");
+      if (load) loadOffer(load);
+      else if (del) deleteOffer(del);
+    });
   }
 
   function newOffer() {
     if (!confirm("Založit novou nabídku? Rozpracovaná data (odběratel, položky) se smažou.")) return;
     localStorage.removeItem(STORAGE_KEY);
+    currentOfferId = null;
     state.customer = { nazev: "", ico: "", dic: "", adresa: "" };
     state.items = [{ desc: "", qty: "1", unit: "ks", qty2: "1", unit2: "", price: "", vat: "21" }];
     state.meta.cislo = nextOfferNumber();
